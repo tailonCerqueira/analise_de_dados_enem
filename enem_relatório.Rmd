@@ -1,0 +1,951 @@
+---
+title: "Análise de dados do ENEM"
+authors: "Argus, Vítor, Tailon Cerqueira"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+#Instalando e carregando pacotes
+library(stringr)
+library(ggplot2)
+library(scales)
+library(reshape2)
+library(readxl)
+library(data.table)
+library(knitr)
+library(ggplot2)
+library(readr)
+library(sqldf)
+
+#setar diretório de trabalho
+setwd('C:/Users/tailo/OneDrive/CIMATEC/Trabalho\ Estatística')
+
+#Leitura de dataset
+dados = read.csv("enem_por_escolas.csv", header = TRUE, sep = ',', dec = ',', stringsAsFactors = F)
+
+```
+
+## Introdução   
+
+O _DATASET_ de trabalho traz dados do **ENEM** por escolas, as informações contidas são as médias das provas com exceção das médias objetivas e das médias totais.
+
+O primeiro passo foi carregar o _DATASET_ de trabalho, o arquivo se encontra em formato _CSV_ e antes de utilizá-lo foram feitas algumas modificações em relação ao tipo de dependência administrativa e localização, ambas  substituídas com base nas informações do dicionário de dados.
+
+## Exploração dos dados   
+
+Na fase de exploração dos dados foram observadas algumas informações no _DATASET_: tamanho (linhas e colunas), variáveis existentes, identificação de colunas onde só existiam valores _NA_, e colunas com valores zerados.
+À partir dessa análise inicial foi verificado as colunas que não fariam parte do estudo pela quantidade de valores faltantes e as quis poderiam ser feitas alterações,  a coluna de número de participantes com necessidades especiais e de médias objetivas foram removidas do estudo e as médias totais foram substituídas pelas médias das outras médias.  
+
+As seguintes variáveis constam do _DATASET_:
+
+```{r echo = FALSE, include=TRUE}
+#Explorando o conjunto de dados
+#str(dados)
+#head(dados)
+names(dados)
+
+```
+
+## Transformações    
+
+O primeiro passo foi converter os dados obtidos para um _DATA TABLE_ à fim de permitir realizar algumas operações e manipulações, com os dados, posteriormente todas as variáveis numéricas foram todas convertidas para dados do tipo numéricos, isso permite as operações matemáticas necessárias.
+Por fim as colunas foram renomeadas de forma que facilitasse melhor sua identificação.  
+
+```{r echo = FALSE, include=FALSE}
+#Conversão para data table
+dados = as.data.table(dados)
+
+#Conversão de dados para inteiro
+dados[,codigo_municipio := as.numeric(codigo_municipio)]
+dados[,codigo_escola_educacenso := as.numeric(codigo_escola_educacenso)]
+dados[,num_matriculas := as.numeric(num_matriculas)]
+dados[,num_participantes_com_necessidades := as.numeric(num_participantes_com_necessidades)]
+dados[,num_participantes := as.numeric(num_participantes)]
+dados[,taxa_participacao := as.numeric(taxa_participacao)]
+dados[,media_ciencias_da_natureza := as.numeric(media_ciencias_da_natureza)]
+dados[,media_ciencias_humanas := as.numeric(media_ciencias_humanas)]
+dados[,media_lingua_portuguesa := as.numeric(media_lingua_portuguesa)]
+dados[,media_matematica := as.numeric(media_matematica)]
+dados[,media_redacao := as.numeric(media_redacao)]
+dados[,media_objetivas := as.numeric(media_objetivas)]
+dados[,media_total := as.numeric(media_total)]
+dados[,indicador_nivel_socioeconomico := as.numeric(indicador_nivel_socioeconomico)]
+dados[,adequacao_da_formacao_docente := as.numeric(adequacao_da_formacao_docente)]
+dados[,taxa_de_permanencia_escolar := as.numeric(taxa_de_permanencia_escolar)]
+dados[,taxa_de_aprovacao := as.numeric(taxa_de_aprovacao)]
+dados[,taxa_de_reprovacao := as.numeric(taxa_de_reprovacao)]
+dados[,taxa_de_abandono := as.numeric(taxa_de_abandono)]
+```
+
+## Agrupamento dos dados   
+
+Os dados foram agrupados por anos, o _DATASET_ contém dados do *ENEM* por escola de 2005 a 2015, escolhemos por utilizar o ano de 2015, pois os anos anteriores possuíam muitas variáveis como _NA_ e a redução na quantidade de anos possibilitaria uma análise mais limitada.
+Devido a falta de dados sobre a média das provas objetivas, o _DATASET_ não continha as médias totais, como se tratava de uma informação importante, exclui-se as médias objetivas e as médias totais foram preenchidas com base nas outras médias.  
+Também foi feito um agrupamento dos dados por estados para que fosse feita uma análise de dados nessa categoria.  
+
+```{r echo = FALSE, include=FALSE}
+#Agrupamento das edições em seus respectivos anos
+ano_2015 = dados[ano == 2015]
+total_linha_2015 = nrow(ano_2015)
+
+#Agrupamentos de dados (número de participantes e porte escolar) dentro de faixas#####
+# organizando número de participantes em faixas
+# dados[num_participantes %between% c(0,100), num_participantes_grupos := "0 - 100"]
+# dados[num_participantes %between% c(101,200), num_participantes_grupos := "101 - 200"]
+# dados[num_participantes %between% c(201,300), num_participantes_grupos := "201 - 300"]
+# dados[num_participantes %between% c(301,400), num_participantes_grupos := "301 - 400"]
+# dados[num_participantes %between% c(401,500), num_participantes_grupos := "401 - 500"]
+# dados[num_participantes %between% c(501,600), num_participantes_grupos := "501 - 600"]
+# dados[num_participantes %between% c(601,700), num_participantes_grupos := "601 - 700"]
+# dados[num_participantes >= 700, num_participantes_grupos := "700 +"]
+# 
+# freq = table(dados$num_participantes_grupos)
+# prop = round(prop.table(table(dados$num_participantes_grupos))*100,2)
+# kable(cbind(freq,prop),col.names = c("Freq","Prop"))
+
+(table(dados$porte_escolar))
+# organizando esolas por porte
+dados[porte_escolar %in% "De 1 a 30 alunos", porte_escolar_grupos := "1 - 30 alunos"]
+dados[porte_escolar %in% "De 31 a 60 alunos", porte_escolar_grupos := "31 - 60 alunos"]
+dados[porte_escolar %in% "De 61 a 90 alunos", porte_escolar_grupos := "61 - 90 alunos"]
+dados[porte_escolar %in% "Maior que 90 alunos", porte_escolar_grupos := "> 90 alunos"]
+
+freq = table(dados$porte_escolar)
+prop = round(prop.table(table(dados$porte_escolar))*100,2)
+kable(cbind(freq,prop),col.names = c("Freq","Prop"))
+
+#Função de agrupamento | Agrupa os mesmos dados (num_participantes)
+agrupar <- function(x, grupos = NULL, sep = "-", text = ""){
+  # Input: Vetor com valores numéricos.
+  # Output: Fator com nomes dos grupos da variável numérica.
+  if(length(grupos) < 2) {
+    stop("Número de grupos deve ser maior que 2.")		
+  }
+  x <- as.numeric(x)
+  brackets <- paste(grupos, grupos[2:length(grupos)]-1, sep = sep)
+  brackets[length(grupos)] <- paste0(grupos[length(grupos)], " +")
+  x <- factor(findInterval(x, grupos), levels = c(1:length(brackets)))
+  levels(x) <- paste0(brackets, text)
+  x
+}
+
+dados$num_participantes_grupos <- agrupar(dados$num_participantes, grupos = c( 0, 100, 200, 300, 400, 500, 600, 700))
+table(dados$num_participantes_grupos)
+
+#Loop para setar as médias totais excluindo-se a média de provas
+for(j in 1:total_linha_2015){
+  soma =  ano_2015[,media_ciencias_da_natureza][j] + 
+    ano_2015[,media_ciencias_humanas][j] +
+    ano_2015[,media_lingua_portuguesa][j] +
+    ano_2015[,media_matematica][j] +
+    ano_2015[,media_redacao][j]
+  media = soma/5
+  ano_2015$media_total[j] = round(media, digits = 2)
+  
+}
+
+#Loop para calcular as médias sem redação####
+for(k in 1:total_linha_2015){
+  soma =  ano_2015[,media_ciencias_da_natureza][k] + 
+    ano_2015[,media_ciencias_humanas][k] +
+    ano_2015[,media_lingua_portuguesa][k] +
+    ano_2015[,media_matematica][k]
+  media = soma/4
+  ano_2015$media_sem_redacao[k] = round(media, digits = 2)
+  ano_2015$media_sem_redacao[k]
+}
+```
+
+## Distribução das Frequências   
+
+Através das distribuições de frequências das variáveis percebeu-se uma grande quantidade aparições do valor de 100% na taxa de participação, adequação da formação docente e taxa de aprovação. E uma relação inversa nas taxas de reprovação e taxa de abandono.  
+
+```{r echo  = FALSE, include=TRUE}
+#Distribuições de frequência possibilitam o entendimento do comportamento das variáveis
+#Variáveis quantitativas devem ser agrupadas antes da construção de distribuições de frequências
+"Frequência Taxa de Participação"
+ano_2015[taxa_participacao %between% c(0,25), taxa_participacao_grupos := "0 - 25"]
+ano_2015[taxa_participacao %between% c(26,50), taxa_participacao_grupos := "26 - 50"]
+ano_2015[taxa_participacao %between% c(51,75), taxa_participacao_grupos := "51 - 75"]
+ano_2015[taxa_participacao >= 75, taxa_participacao_grupos := "> 75"]
+
+freq = table(ano_2015$taxa_participacao_grupos)
+prop = round(prop.table(table(ano_2015$taxa_participacao_grupos))*100,2)
+kable(cbind(freq,prop),col.names = c("Freq","Prop"))
+
+####
+"Frequência Adequação da Formação Docente"
+
+ano_2015[adequacao_da_formacao_docente %between% c(0,25), adequacao_da_formacao_docente_grupos := "0 - 25"]
+ano_2015[adequacao_da_formacao_docente %between% c(26,50), adequacao_da_formacao_docente_grupos := "26 - 50"]
+ano_2015[adequacao_da_formacao_docente %between% c(51,75), adequacao_da_formacao_docente_grupos := "51 - 75"]
+ano_2015[adequacao_da_formacao_docente >= 75, adequacao_da_formacao_docente_grupos := "> 75"]
+
+freq = table(ano_2015$adequacao_da_formacao_docente_grupos)
+prop = round(prop.table(table(ano_2015$adequacao_da_formacao_docente_grupos))*100,2)
+kable(cbind(freq,prop),col.names = c("Freq","Prop"))
+
+####
+"Frequência Taxa de Reprovação"
+ano_2015[taxa_de_reprovacao %between% c(0,25), taxa_de_reprovacao_grupos := "0 - 25"]
+ano_2015[taxa_de_reprovacao %between% c(26,50), taxa_de_reprovacao_grupos := "26 - 50"]
+ano_2015[taxa_de_reprovacao %between% c(51,75), taxa_de_reprovacao_grupos := "51 - 75"]
+ano_2015[taxa_de_reprovacao >= 75, taxa_de_reprovacao_grupos := "> 75"]
+
+freq = table(ano_2015$taxa_de_reprovacao_grupos)
+prop = round(prop.table(table(ano_2015$taxa_de_reprovacao_grupos))*100,2)
+kable(cbind(freq,prop),col.names = c("Freq","Prop"))
+
+####
+"Frequência Taxa de Abandono"
+ano_2015[taxa_de_abandono %between% c(0,25), taxa_de_abandono_grupos := "0 - 25"]
+ano_2015[taxa_de_abandono %between% c(26,50), taxa_de_abandono_grupos := "26 - 50"]
+ano_2015[taxa_de_abandono %between% c(51,75), taxa_de_abandono_grupos := "51 - 75"]
+ano_2015[taxa_de_abandono >= 75, taxa_de_abandono_grupos := "> 75"]
+
+freq = table(ano_2015$taxa_de_abandono_grupos)
+prop = round(prop.table(table(ano_2015$taxa_de_abandono_grupos))*100,2)
+kable(cbind(freq,prop),col.names = c("Freq","Prop"))
+```
+
+## Avaliação da simetria dos dados   
+
+Posteriormente foi avaliada a normalização dos dados a serem avaliados no _DATASET_.Com base na análise dos gráficos boxlot e histograma, das médias das provas, adequação da formação docente, percebe-se uma aparente normalidade.
+Já as variáveis (num_matriculas, num_participantes, taxa_de_permanencia_escolar, taxa_de_reprovacao, taxa_de_abandono) foram normalizados com aplicação do log.  
+
+```{r echo  = FALSE, include=TRUE}
+###Avaliando simetria dos dados
+par(mfrow=c(1,2))
+boxplot(ano_2015$num_matriculas)
+hist(ano_2015$num_matriculas, xlab  = "Número de Matrículas",  main = "")
+
+par(mfrow=c(1,2))
+boxplot(ano_2015$num_participantes)
+hist(ano_2015$num_participantes, xlab  = "Número de Participantes",  main = "")
+
+par(mfrow=c(1,2))
+boxplot(ano_2015$taxa_participacao)
+hist(ano_2015$taxa_participacao, xlab  = "Taxa de Participação",  main = "")
+
+par(mfrow=c(1,2))
+boxplot(ano_2015$media_ciencias_da_natureza)
+hist(ano_2015$media_ciencias_da_natureza, xlab  = "Ciências da Natureza",  main = "")
+
+par(mfrow=c(1,2))
+boxplot(ano_2015$media_ciencias_humanas)
+hist(ano_2015$media_ciencias_humanas, xlab  = "Ciências Humanas",  main = "")
+
+par(mfrow=c(1,2))
+boxplot(ano_2015$media_lingua_portuguesa)
+hist(ano_2015$media_lingua_portuguesa, xlab  = "Língua Portuguesa",  main = "")
+
+par(mfrow=c(1,2))
+boxplot(ano_2015$media_matematica)
+hist(ano_2015$media_matematica, xlab  = "Matemática",  main = "")
+
+par(mfrow=c(1,2))
+boxplot(ano_2015$media_redacao, xlab  = "Redação",  main = "")
+hist(ano_2015$media_redacao)
+
+par(mfrow=c(1,2))
+boxplot(ano_2015$media_total)
+hist(ano_2015$media_total, xlab  = "Média Total",  main = "")
+
+par(mfrow=c(1,2))
+boxplot(ano_2015$adequacao_da_formacao_docente)
+hist(ano_2015$adequacao_da_formacao_docente, xlab  = "A. Formação Docente",  main = "")
+
+par(mfrow=c(1,2))
+boxplot(ano_2015$taxa_de_permanencia_escolar)
+hist(ano_2015$taxa_de_permanencia_escolar, xlab  = "Permanência Escolar",  main = "")
+
+par(mfrow=c(1,2))
+boxplot(ano_2015$taxa_de_aprovacao)
+hist(ano_2015$taxa_de_aprovacao, xlab  = "Taxa de Aprovação",  main = "")
+
+par(mfrow=c(1,2))
+boxplot(ano_2015$taxa_de_reprovacao)
+hist(ano_2015$taxa_de_reprovacao, xlab  = "Taxa de Reprovação",  main = "")
+
+par(mfrow=c(1,2))
+boxplot(ano_2015$taxa_de_abandono)
+hist(ano_2015$taxa_de_abandono, xlab  = "Taxa de Abandono",  main = "")
+
+#Simetria e normalização#####
+
+# Aplicando transformações
+ano_2015poptransf_matriculas <- ano_2015[ 
+  , list(log = log(num_matriculas),
+         p25 = num_matriculas^(1/4),
+         p50 = num_matriculas^(1/2),
+         p33 = num_matriculas^(1/3))
+]
+
+"Avaliação de simetria do número de matrículas"
+par(mfrow=c(2,2))
+hist(ano_2015poptransf_matriculas$log, main="log", ylab="", xlab="", col="darkgrey", border="white")
+hist(ano_2015poptransf_matriculas$p25, main="p=1/4", ylab="", xlab="", col="darkgrey", border="white")
+hist(ano_2015poptransf_matriculas$p50, main="p=1/2", ylab="", xlab="", col="darkgrey", border="white")
+hist(ano_2015poptransf_matriculas$p33, main="p=1/3", ylab="", xlab="", col="darkgrey", border="white")
+#Aparente normalização com log
+
+# Aplicando transformações
+ano_2015poptransf_participantes <- ano_2015[ 
+  , list(log = log(num_participantes),
+         p25 = num_participantes^(1/4),
+         p50 = num_participantes^(1/2),
+         p33 = num_participantes^(1/3))
+]
+
+"Avaliação de simetria do número de participantes"
+par(mfrow=c(2,2))
+hist(ano_2015poptransf_participantes$log, main="log", ylab="", xlab="", col="darkgrey", border="white")
+hist(ano_2015poptransf_participantes$p25, main="p=1/4", ylab="", xlab="", col="darkgrey", border="white")
+hist(ano_2015poptransf_participantes$p50, main="p=1/2", ylab="", xlab="", col="darkgrey", border="white")
+hist(ano_2015poptransf_participantes$p33, main="p=1/3", ylab="", xlab="", col="darkgrey", border="white")
+#Aparente normalização com log
+
+# Aplicando transformações
+ano_2015poptransf_permanencia <- ano_2015[ 
+  , list(log = log(taxa_de_permanencia_escolar),
+         p25 = taxa_de_permanencia_escolar^(1/4),
+         p50 = taxa_de_permanencia_escolar^(1/2),
+         p33 = taxa_de_permanencia_escolar^(1/3))
+]
+
+"Avaliação de simetria da taxa de permanência"
+par(mfrow=c(2,2))
+hist(ano_2015poptransf_permanencia$log, main="log", ylab="", xlab="", col="darkgrey", border="white")
+hist(ano_2015poptransf_permanencia$p25, main="p=1/4", ylab="", xlab="", col="darkgrey", border="white")
+hist(ano_2015poptransf_permanencia$p50, main="p=1/2", ylab="", xlab="", col="darkgrey", border="white")
+hist(ano_2015poptransf_permanencia$p33, main="p=1/3", ylab="", xlab="", col="darkgrey", border="white")
+#Normalizado com applicação do log
+
+# Aplicando transformações
+ano_2015poptransf_reprovacao <- ano_2015[ 
+  , list(log = log(taxa_de_reprovacao),
+         p25 = taxa_de_reprovacao^(1/4),
+         p50 = taxa_de_reprovacao^(1/2),
+         p33 = taxa_de_reprovacao^(1/3))
+]
+
+"Avaliação de simetria da taxa de reprovação"
+par(mfrow=c(2,2))
+hist(ano_2015poptransf_reprovacao$log, main="log", ylab="", xlab="", col="darkgrey", border="white")
+hist(ano_2015poptransf_reprovacao$p25, main="p=1/4", ylab="", xlab="", col="darkgrey", border="white")
+hist(ano_2015poptransf_reprovacao$p50, main="p=1/2", ylab="", xlab="", col="darkgrey", border="white")
+hist(ano_2015poptransf_reprovacao$p33, main="p=1/3", ylab="", xlab="", col="darkgrey", border="white")
+#Normalizado com applicação do log
+
+# Aplicando transformações
+ano_2015poptransf_abandono <- ano_2015[ 
+  , list(log = log(taxa_de_abandono),
+         p25 = taxa_de_abandono^(1/4),
+         p50 = taxa_de_abandono^(1/2),
+         p33 = taxa_de_abandono^(1/3))
+]
+
+"Avaliação de simetria da taxa de abandono"
+par(mfrow=c(2,2))
+hist(ano_2015poptransf_abandono$log, main="log", ylab="", xlab="", col="darkgrey", border="white")
+hist(ano_2015poptransf_abandono$p25, main="p=1/4", ylab="", xlab="", col="darkgrey", border="white")
+hist(ano_2015poptransf_abandono$p50, main="p=1/2", ylab="", xlab="", col="darkgrey", border="white")
+hist(ano_2015poptransf_abandono$p33, main="p=1/3", ylab="", xlab="", col="darkgrey", border="white")
+#Aparente normalização com log
+
+
+# Aplicando transformações
+ano_2015poptransf_participacao <- ano_2015[ 
+  , list(log = log(taxa_participacao),
+         p25 = taxa_participacao^(1/4),
+         p50 = taxa_participacao^(1/2),
+         p33 = taxa_participacao^(1/3))
+]
+
+"Avaliação de simetria da taxa de participaçãoo"
+par(mfrow=c(2,2))
+hist(ano_2015poptransf_participacao$log, main="log", ylab="", xlab="", col="darkgrey", border="white")
+hist(ano_2015poptransf_participacao$p25, main="p=1/4", ylab="", xlab="", col="darkgrey", border="white")
+hist(ano_2015poptransf_participacao$p50, main="p=1/2", ylab="", xlab="", col="darkgrey", border="white")
+hist(ano_2015poptransf_participacao$p33, main="p=1/3", ylab="", xlab="", col="darkgrey", border="white")
+#Aparente normalização com log
+
+# Aplicando transformações
+ano_2015poptransf_aprovacao <- ano_2015[ 
+  , list(log = log(taxa_de_aprovacao),
+         p25 = taxa_de_aprovacao^(1/4),
+         p50 = taxa_de_aprovacao^(1/2),
+         p33 = taxa_de_aprovacao^(1/3))
+]
+
+"Avaliação de simetria da taxa de aprovação"
+par(mfrow=c(2,2))
+hist(ano_2015poptransf_aprovacao$log, main="log", ylab="", xlab="", col="darkgrey", border="white")
+hist(ano_2015poptransf_aprovacao$p25, main="p=1/4", ylab="", xlab="", col="darkgrey", border="white")
+hist(ano_2015poptransf_aprovacao$p50, main="p=1/2", ylab="", xlab="", col="darkgrey", border="white")
+hist(ano_2015poptransf_aprovacao$p33, main="p=1/3", ylab="", xlab="", col="darkgrey", border="white")
+#Aparentemente não houve normalização
+```
+
+## Coleta de amostras   
+
+As amostras de tamanho 11 e 15 apresentaram resultados de normalidade para os dados coletados. Através do parâmetro média total, tomando-se como base 50 amostras de tamanho 100, as amostras chegaram perto do parâmetro amostral.  
+Por fim verifica-se que a diferença entre a estimativa e o parâmetro começa a diminuir cada vez a partir de amostra de tamanho 1000.  
+Com a aplicação das medidas de centralidade e de dispersão, verificou-se que os dados das médias não estão muitos dispersas. Com exceção das médias de matemática.  
+
+```{r echo = FALSE, include=FALSE}
+set.seed(6520)
+
+enem_2015 <- ano_2015[sample(nrow(ano_2015), 30), ]
+
+#Agrupamento por estado Acre
+escolas_ac <- ano_2015[sample(nrow(ano_2015[sigla_estado == "AC"]), 30), ]
+
+#Agrupamento por estado Alagoas
+escolas_al <- ano_2015[sample(nrow(ano_2015[sigla_estado == "AL"]), 30), ]
+
+#Agrupamento por estado Amapá
+escolas_ap <- ano_2015[sample(nrow(ano_2015[sigla_estado == "AP"]), 30), ]
+
+#Agrupamento por estado Amazonas
+escolas_am <- ano_2015[sample(nrow(ano_2015[sigla_estado == "AM"]), 30), ]
+
+#Agrupamento por estado Bahia
+escolas_ba <- ano_2015[sample(nrow(ano_2015[sigla_estado == "BA"]), 30), ]
+
+#Agrupamento por estado Ceará
+escolas_ce <- ano_2015[sample(nrow(ano_2015[sigla_estado == "CE"]), 30), ]
+
+#Agrupamento por estado Distrito Federal
+escolas_df <- ano_2015[sample(nrow(ano_2015[sigla_estado == "DF"]), 30), ]
+
+#Agrupamento por estado Espiríto Santo
+escolas_es <- ano_2015[sample(nrow(ano_2015[sigla_estado == "ES"]), 30), ]
+
+#Agrupamento por estado Goiás
+escolas_go <- ano_2015[sample(nrow(ano_2015[sigla_estado == "GO"]), 30), ]
+
+#Agrupamento por estado Maranhão
+escolas_ma <- ano_2015[sample(nrow(ano_2015[sigla_estado == "MA"]), 30), ]
+
+#Agrupamento por estado Mato Grosso
+escolas_mt <- ano_2015[sample(nrow(ano_2015[sigla_estado == "MT"]), 30), ]
+
+#Agrupamento por estado Mato Grosso do Sul
+escolas_ms <- ano_2015[sample(nrow(ano_2015[sigla_estado == "MS"]), 30), ]
+
+#Agrupamento por estado Minas Gerais
+escolas_mg <- ano_2015[sample(nrow(ano_2015[sigla_estado == "MG"]), 30), ]
+
+#Agrupamento por estado Pará
+escolas_pa <- ano_2015[sample(nrow(ano_2015[sigla_estado == "PA"]), 30), ]
+
+#Agrupamento por estado Paraíba
+escolas_pb <- ano_2015[sample(nrow(ano_2015[sigla_estado == "PB"]), 30), ]
+
+#Agrupamento por estado paraná
+escolas_pr <- ano_2015[sample(nrow(ano_2015[sigla_estado == "PR"]), 30), ]
+
+#Agrupamento por estado Pernambuco
+escolas_pe <- ano_2015[sample(nrow(ano_2015[sigla_estado == "PE"]), 30), ]
+
+#Agrupamento por estado Piauí
+escolas_pi <- ano_2015[sample(nrow(ano_2015[sigla_estado == "PI"]), 30), ]
+
+#Agrupamento por estado Rio de Janeiro
+escolas_rj <- ano_2015[sample(nrow(ano_2015[sigla_estado == "RJ"]), 30), ]
+
+#Agrupamento por estado Rio Grande do Norte
+escolas_rn <- ano_2015[sample(nrow(ano_2015[sigla_estado == "RN"]), 30), ]
+
+#Agrupamento por estado Rondônia
+escolas_ro <- ano_2015[sample(nrow(ano_2015[sigla_estado == "RO"]), 30), ]
+
+#Agrupamento por estado Roraima
+escolas_rr <- ano_2015[sample(nrow(ano_2015[sigla_estado == "RR"]), 30), ]
+
+#Agrupamento por estado Rio Grande do Sul
+escolas_rs <- ano_2015[sample(nrow(ano_2015[sigla_estado == "RS"]), 30), ]
+
+#Agrupamento por estado Santa Catarina
+escolas_sc <- ano_2015[sample(nrow(ano_2015[sigla_estado == "SC"]), 30), ]
+
+#Agrupamento por estado São Paulo
+escolas_sp <- ano_2015[sample(nrow(ano_2015[sigla_estado == "SP"]), 30), ]
+
+#Agrupamento por estado Sergipe
+escolas_se <- ano_2015[sample(nrow(ano_2015[sigla_estado == "SE"]), 30), ]
+
+#Agrupamento por estado Sergipe
+escolas_to <- ano_2015[sample(nrow(ano_2015[sigla_estado == "TO"]), 30), ]
+```
+
+## Infência dos dados   
+
+```{r echo = FALSE, include=FALSE}
+# Distribuição amostral
+mean(ano_2015$media_total,na.rm=T)
+var(ano_2015$media_total,na.rm=T)
+medias = c(mean(sample(ano_2015[!is.na(media_total)]$media_total,2))
+           ,mean(sample(ano_2015[!is.na(media_total)]$media_total,4))
+           ,mean(sample(ano_2015[!is.na(media_total)]$media_total,6))
+           ,mean(sample(ano_2015[!is.na(media_total)]$media_total,8))
+           ,mean(sample(ano_2015[!is.na(media_total)]$media_total,20))
+           ,mean(sample(ano_2015[!is.na(media_total)]$media_total,50))
+           ,mean(sample(ano_2015[!is.na(media_total)]$media_total,100))
+           ,mean(sample(ano_2015[!is.na(media_total)]$media_total,200))
+           ,mean(sample(ano_2015[!is.na(media_total)]$media_total,300))
+           ,mean(sample(ano_2015[!is.na(media_total)]$media_total,400))
+           ,mean(sample(ano_2015[!is.na(media_total)]$media_total,500))
+           ,mean(sample(ano_2015[!is.na(media_total)]$media_total,600))
+           ,mean(sample(ano_2015[!is.na(media_total)]$media_total,700))
+           ,mean(sample(ano_2015[!is.na(media_total)]$media_total,800))
+           ,mean(sample(ano_2015[!is.na(media_total)]$media_total,900))
+           ,mean(sample(ano_2015[!is.na(media_total)]$media_total,1000))
+)
+plot(medias)
+abline(a=mean(ano_2015$media_total,na.rm=T),b=0)
+
+#Inicializando as variaveis como vetores numericos
+## Media para amostras de tam 4
+xbar4<-numeric()
+## Media para amostras de tam 8
+xbar8<-numeric()
+## Media para amostras de tam 11
+xbar11<-numeric()
+## Media para amostras de tam 15
+xbar15<-numeric()
+## Media para amostras de tam 30
+xbar30<-numeric()
+## Media para amostras de tam 100
+xbar100<-numeric()
+
+for ( i in 1:200){
+  # Extraindo amostras de tamanho 4 e calculando a média
+  smp<-sample(ano_2015[!is.na(media_total)]$media_total,size = 4)
+  xbar4[i]<-round(mean(smp),2)
+  
+  # Extraindo amostras de tamanho 8 e calculando a média
+  smp<-sample(ano_2015[!is.na(media_total)]$media_total,size = 8)
+  xbar8[i]<-round(mean(smp),2)
+  
+  # Extraindo amostras de tamanho 11 e calculando a média
+  smp<-sample(ano_2015[!is.na(media_total)]$media_total,size = 11)
+  xbar11[i]<-round(mean(smp),2)
+  
+  # Extraindo amostras de tamanho 15 e calculando a média
+  smp<-sample(ano_2015[!is.na(media_total)]$media_total,size = 15)
+  xbar15[i]<-round(mean(smp),2)
+  
+  # Extraindo amostras de tamanho 30 e calculando a média
+  smp<-sample(ano_2015[!is.na(media_total)]$media_total,size = 30)
+  xbar30[i]<-round(mean(smp),2)
+  
+  # Extraindo amostras de tamanho 100 e calculando a média
+  smp<-sample(ano_2015[!is.na(media_total)]$media_total,size = 100)
+  xbar100[i]<-round(mean(smp),2)
+}
+
+par(mfrow=c(2,3))
+hist(xbar4, col="lightblue4", border="white",freq = FALSE, breaks = 15, main=paste0("n=4 ",round(mean(xbar15),2)))
+hist(xbar8, col="lightblue4", border="white",freq = FALSE, breaks = 15, main=paste0("n=8 ",round(mean(xbar30),2)))
+hist(xbar11, col="lightblue4", border="white",freq = FALSE, breaks = 15, main=paste0("n=11 ",round(mean(xbar100),2)))
+hist(xbar15, col="lightblue4", border="white",freq = FALSE, breaks = 15, main=paste0("n=15 ",round(mean(xbar15),2)))
+hist(xbar30, col="lightblue4", border="white",freq = FALSE, breaks = 15, main=paste0("n=30 ",round(mean(xbar30),2)))
+hist(xbar100, col="lightblue4", border="white",freq = FALSE, breaks = 15, main=paste0("n=100 ",round(mean(xbar100),2)))
+```
+
+Para amostras de tamanho 30 foi encontrado uma aparente normalização dos dados.
+Para variável media total do _ENEM 2015_, observa-se que a idade ~N(525.85, 2824.18).
+Colhendo-se uma amostra de n = 1000, pelo TCL, X_barra terá uma distribuição amostral com média 525.85 e variância 2.82418.
+
+x_barra~N(525.85, 2.82418)
+
+Selecionando uma amostra de maneira justa, a probabilidade de se eonctrar a média diferindo de mi em menos de 100 pontos é de:
+
+P(|x_barra - 525.85| < 100) = P(425.85 < x_barra < 625.85)
+
+```{r echo = FALSE}
+mi_media_total_amostra = mean(ano_2015$media_total,na.rm=T)
+
+"Média Amostral"
+round(mi_media_total_amostra, digits = 2)
+
+var_media_total = var(ano_2015$media_total,na.rm=T)
+
+"Variância"
+round(var_media_total, digits = 2)
+```
+
+## Propriedade dos estimadores   
+
+```{r echo = FALSE, include=FALSE}
+"Parâmetro amostral"
+parametro = mean(dados$media_total,na.rm=T)
+# Extraindo 50 amostras de tamanho 100 e calculando a média amostral através do estimador x barra
+n = 100
+amostras = 50
+x_barra = c()
+for( i in 1:amostras){
+  x_barra[i]<-mean(sample(dados[!is.na(media_total)]$media_total, size = n, replace=T)) 
+}
+"X_barra"
+x_barra
+
+"Checando se em média o estimador X_barra acerta o parâmetro"
+mean(x_barra)
+parametro
+
+# Checando se a diferença entre a estimativa e o parâmetro tende a ser pequena para n grande 
+ns = c(100,500,1000,2000,5000,10000)
+amostras = 50
+var_amostral = c()
+x_barra = c()
+for(n in 1:length(ns)){# para cada tamanho de amostra
+  print(paste0("Obtendo 50 amostras de tamanho: ",ns[n]," e calculando a média."))
+  for( i in 1:amostras){#Retirar 50 amostras aleatórias e calcular variância
+    x_barra[i]<-mean(sample(ano_2015[!is.na(media_total)]$media_total, size = ns[n], replace=T))
+  }
+  print("Médias:")
+  print(x_barra)
+  var_amostral[n] <- var(x_barra)
+}
+var_amostral
+plot(ns,var_amostral,xlab="Tamanho da amostra",
+     ylab = "Variância amostral",
+     type="b",
+     pch = 19, 
+     col = "red")
+```
+
+Foi obtido o parâmetro da amostra:
+
+parametro = mean(dados$media_total,na.rm=T)
+> parametro
+[1] 46.89404
+
+Através do parâmetro de média total e obtendo 100 amostras de tamanho 50 percebe-se que o estimador acerta o valor do parâmetro:
+
+Checando se em média o estimador x barra acerta o parâmetro
+> mean(x_barra)
+[1] 46.85438
+
+Em relação a variação amostral, com cerca de 5000 amostras é possível perceber que começar haver uma redução na variação amostral.
+
+## Intervalo de confiança   
+
+Tomando-se como nível de confiança de 90% para a construção do intervalo de confiança, é possível afirmar com 90% de certeza de que o verdadeiro valor está entre o intervalo abaixo:
+	517.5257 ~ 519.8521  
+
+```{r echo = FALSE, include=FALSE}
+amostras = 100 # Numero de amostras
+n=50 # Numero de observações por amostra
+
+x_sim<-matrix(NA,n,amostras) 
+# x_sim armazenara as amostras simuladas
+# x_sim é uma matriz de dados ( a príncipio preenchida com NAs) onde cada coluna da patriz representa
+# uma amostra aleatória retirada da população, cada amostra tem 25 observações. 
+
+for( i in 1:amostras){
+  x_sim[,i]<-sample(dados[!is.na(media_total)]$media_total, size = n, replace=T) 
+  #x_sim <- cbind(x_sim,amostra)
+}
+
+
+# Calculando intervalos de confiança
+# Exemplo IC distribuição normal e variância conhecida:
+
+li90 <- mean(ano_2015$media_total) - 1.645*1/sqrt(length(ano_2015$media_total))
+ls90 <- mean(ano_2015$media_total) + 1.645*1/sqrt(length(ano_2015$media_total))
+
+ic90 <- c(li90,ls90)
+ic90
+```
+
+## Teste de Hipótese
+
+1. Definição das Hipóteses
+
+Ho: Alunos de escolas privadas tem taixa de aprovação igual ou acima de 90%;
+H1: Alunos de escolas privadas tem taixa de aprovação abaixo de 90%
+com notas inferiores.
+
+H0 >= 90
+H1 < 90
+
+
+Cálculo da média populacional
+com variância conhecida e tamanho de amostra pequeno 
+
+```{r echo = FALSE, include=FALSE}
+mean(ano_2015[!is.na(taxa_de_aprovacao) & tipo_dependecia_administrativa %in% "Privada"]$taxa_de_aprovacao)
+x <- sample(ano_2015[!is.na(taxa_de_aprovacao) & tipo_dependecia_administrativa %in% "Privada"]$taxa_de_aprovacao,30)
+
+hist(x)
+
+quantis <- qt(0.90, df = length(x)-1)
+```
+
+2. cálcular estimador
+
+```{r echo = FALSE, include=FALSE}
+xbarra <- mean(x)
+desvio <- sd(x)
+n <- length(x)
+```
+
+3. Definição do nível de significância
+Nível de significância
+Por padrão é usao de 0,5
+
+
+4. Estatística de teste
+
+```{r echo = FALSE, include=FALSE}
+t <- (xbarra - enem_2015$media_redacao)/(desvio/sqrt(n))
+```
+
+5. Interpretação e coclusão
+
+Rejeitamos H0 se t > quantis
+
+```{r echo = FALSE, include=FALSE}
+t > quantis
+```
+
+Teste unilateral esquerdo
+
+```{r echo = FALSE, include=FALSE}
+```
+
+```{r echo = FALSE, include=FALSE}
+quantis <- qt(0.1, df = length(x)-1)
+```
+
+Rejeitamos H0 se t < quantis
+t < quantis
+
+## Teste regressão Linear
+
+Inicialmente foi coletada as amostras sobre taxa de aprovação e a média de redação a fim de avaliar se há uma relação entre essas duas variáveis, através da geração do modelo e traçando-se um gráfico foi possível verificar que existe uma relação positiva e que há uma significância já que pela _análise variância (ANOVA)_ o _p-value_ é menor que *0.5* e portanto, a existe uma significância no modelo.
+
+Através do _R²_ identificamos que a variável dependente é explicada em *0.03931*  pela variável independente.
+
+Através do gráfico de dispersão de resíduos e traçando-se uma reta é possível notar que o tipo de correlação é positiva.
+
+Através dos resíduos em função dos valores estimados percebemos que há uma distribuição aleatória e uma amplitude razoável em torno de zero, atendendo aos princípios de independência e homocedasticidade, no segundo gráfico é possível perceber que os resíduos gerados saem um pouco da normalidade da reta mas assim aceitamos como normal.
+
+O parâmetro associado a variável taxa de adequação da formação docente, assumiu valor 0,03. Este valor representa o acréscimo na variável taxa de aprovação. Portanto, ao aumentar um por cento na adequação da formação docente, os participantes têm sua taxa de aprovação aumentando, em média 0,03 unidades.
+
+Através do teste de Shapiro é possível avaliar se amostra selecionado apresenta a distribuição normal, avaliando o p-valor maior do que o nível de significância de *0,5* assumimos que a distribuição não é normal pois ele é menor que *5%* e os dados não possuem uma variação normal.
+
+```{r echo = FALSE, include=TRUE}
+set.seed(6525)
+#Coleta de amostras
+y <- sample(enem_2015$taxa_de_aprovacao)
+x <- sample(enem_2015$media_redacao)
+
+#Geração do modelo para avaliar a correlação das variáveis
+modelo = lm(y ~ x)
+modelo
+
+#Observando se há significância ####
+summary(modelo)
+## Coeficientes do modelo (intercepto e beta)
+anova(modelo)
+
+# Linearidade #####
+
+#Plotagem de gráfico de dispersão
+plot(x,y,xlab="Média Total",ylab="Taxa de Aprovação", pch = 20, main = 'Gráfico de Dispersão')
+abline(lm(y~x))
+# Homocedasticidade dos resíduos####
+par(mfrow = c(2,2))
+plot(modelo, which = c(1:4), pch = 20)
+
+# Normalidade dos Resíduos ####
+hist(modelo$residuals, col = 'gray', xlab = 'Resíduos', ylab = 'Densidade de Probabilidade',
+     probability = TRUE, main = 'Histógrama Residual')
+
+# Shapiro-Wil####
+shapiro.test(rstudent(modelo))
+
+# Valores previstos pelo modelo
+predict(modelo)   
+
+# Resíduos do modelo
+residuals(modelo) 
+
+```
+
+## --
+
+## Questões
+
+#
+**1 - Qual foi a média de aprovados para as escolas com porte maior que 90 alunos?**
+
+#
+
+#
+**2 - Quais as regiões que tiveram maior taxa de abandono? Quais motivos provavelmente levaram a essa taxa**
+
+As regiões que obtiveram as maiores taxa abandono foram as regiões Sul e Sudeste, exceto pela região nordeste a quantidade de matriculas dessas regiões foram as mais expressivas, levando-se em consideração que não houve uma grande diferença entre o número de escolas de zona rural e zona urbana entre as regiões exceto pela região sul que foi a região que apresentou uma maior taxa e poderia ter uma maior taxa de abandono devido a questões de locomoção. Não foi possível afirmar que o tipo de dependência administrativa teve influência.
+
+```{r echo = FALSE, include=TRUE}
+######frequência localização de escolas#####
+#Agrupamento por Região Norte
+matriculados_ac <- escolas_ac$localizacao_da_escola
+matriculados_ap <- escolas_ap$localizacao_da_escola
+matriculados_am <- escolas_am$localizacao_da_escola
+matriculados_pr <- escolas_pr$localizacao_da_escola
+matriculados_ro <- escolas_ro$localizacao_da_escola
+matriculados_rr <- escolas_rr$localizacao_da_escola
+matriculados_to <- escolas_to$localizacao_da_escola
+soma_matriculados_regiao_norte <- c(matriculados_ac, matriculados_ap, matriculados_am, matriculados_pr, matriculados_ro, matriculados_rr, matriculados_to)
+
+freq = table(soma_matriculados_regiao_norte)
+prop = round(prop.table(table(soma_matriculados_regiao_norte))*100,2)
+"Região Norte"
+kable(cbind(freq,prop),col.names = c("Freq","Prop"))
+
+#Agrupamento por Região Centro-Oeste
+matriculados_df <- escolas_df$localizacao_da_escola
+matriculados_go <- escolas_go$localizacao_da_escola
+matriculados_mt <- escolas_mt$localizacao_da_escola
+matriculados_ms <- escolas_ms$localizacao_da_escola
+soma_matriculados_regiao_centro_oeste <- c(matriculados_df, matriculados_go, matriculados_mt, matriculados_ms)
+
+freq = table(soma_matriculados_regiao_centro_oeste)
+prop = round(prop.table(table(soma_matriculados_regiao_centro_oeste))*100,2)
+"Região Centro-Oeste"
+kable(cbind(freq,prop),col.names = c("Freq","Prop"))
+
+#Agrupamento por Região Nordeste
+matriculados_al <- escolas_al$localizacao_da_escola
+matriculados_ba <- escolas_ba$localizacao_da_escola
+matriculados_ce <- escolas_ce$localizacao_da_escola
+matriculados_ma <- escolas_ma$localizacao_da_escola
+matriculados_pb <- escolas_pb$localizacao_da_escola
+matriculados_pe <- escolas_pe$localizacao_da_escola
+matriculados_pi <- escolas_pi$localizacao_da_escola
+matriculados_rn <- escolas_rn$localizacao_da_escola
+matriculados_se <- escolas_se$localizacao_da_escola
+soma_matriculados_regiao_nordeste <- c(matriculados_al, matriculados_ba, matriculados_ce, matriculados_ma, matriculados_pb, matriculados_pe, matriculados_pi, matriculados_rn, matriculados_se)
+
+freq = table(soma_matriculados_regiao_nordeste)
+prop = round(prop.table(table(soma_matriculados_regiao_nordeste))*100,2)
+"Região Nordeste"
+kable(cbind(freq,prop),col.names = c("Freq","Prop"))
+
+#Agrupamento por Região Sudeste
+matriculados_es <- escolas_es$localizacao_da_escola
+matriculados_mg <- escolas_mg$localizacao_da_escola
+matriculados_rj <- escolas_rj$localizacao_da_escola
+matriculados_sp <- escolas_sp$localizacao_da_escola
+soma_matriculados_regiao_sudeste <- c(matriculados_es, matriculados_mg, matriculados_rj, matriculados_sp)
+
+freq = table(soma_matriculados_regiao_sudeste)
+prop = round(prop.table(table(soma_matriculados_regiao_sudeste))*100,2)
+"Região Sudeste"
+kable(cbind(freq,prop),col.names = c("Freq","Prop"))
+
+#Agrupamento por Região Sul
+matriculados_pr <- escolas_pr$localizacao_da_escola
+matriculados_rs <- escolas_rs$localizacao_da_escola
+matriculados_sc <- escolas_sc$localizacao_da_escola
+soma_matriculados_regiao_sul <- c(matriculados_pr, matriculados_rs, matriculados_sc)
+
+freq = table(soma_matriculados_regiao_sul)
+prop = round(prop.table(table(soma_matriculados_regiao_sul))*100,2)
+"Região Sul"
+kable(cbind(freq,prop),col.names = c("Freq","Prop"))
+```
+#
+
+#
+**3 - Qual a relevância da formação docente nas médias das escolas públicas e privadas?** 
+
+Devido ao valor próximo das médias entre a taxa de adequação da formação docente entre as escolas públicas e as escolas privadas, não foi possível afirmar que uma maior taxa em um dos dois tipos de dependência administrativa teve uma influência significativa nas médias totais das escolas no ENEM de 2015.
+
+```{r echo = FALSE, include=TRUE}
+#Agrupamento por escolas públicas e privadas#####
+
+escolas_privadas = (enem_2015[tipo_dependecia_administrativa == "Privada"])
+escolas_publicas = (enem_2015[tipo_dependecia_administrativa != "Privada"])
+
+mean(escolas_privadas$adequacao_da_formacao_docente)
+summary(escolas_privadas$adequacao_da_formacao_docente)
+
+
+mean(escolas_publicas$adequacao_da_formacao_docente)
+summary(escolas_publicas$adequacao_da_formacao_docente)
+
+```
+
+Outros fatores que podem ter influenciado nos desempenhos das escolas podem ter sido o nível de infraestrutura das escolas (investimento em sala de aulas, laboratórios, biblioteca etc.).
+
+Sendo assim podemos afirmar que são necessários outros tipos de investimento para um melhor desempenho dos alunos. 
+
+A capacitação dos professores não é o único fator relevante no processo de capacitação dos alunos.
+#
+
+#
+
+**4 - Há uma diferença de desempenho entre as escolas a depender da localização?** 
+
+Como não foi encontrado apenas um registro de escola rural na amostra recolhida não foi possível tirar muitas conclusões a respeito do desempenho das escolas de zona rual em relação as escolas de zona urbnana.
+Em relação a esse registro encontrado, pode ser avaliado que as médias das provas foram bem inferiores as médias das provas das escolas de localização urbana, além disso houve um índice muito abaixo da média para a variável de adequação da formação docente, o que pode sugerir uma menor preparação dos professores das escolas rurais.
+
+#
+
+#
+**5 - Com base no desempenho da(s) [instituições de ensino/UF/cidade], quais fatores [regionais, socioeconômicos, raciais, etc.] podem ser influenciadores?**
+
+
+
+
+#
+
+#
+**6 - Há multicolinearidade entre as variáveis explicativas do modelo?**
+
+
+
+#
+
+#
+**7 - Em quais estados houve uma menor taxa de participação? E o que explica essa taxa?**
+Taxa de participação X INSE
+#
+
+#
+**8 - Visto que as provas de redação são consideradas de maior relevância no enem o que se pode avaliar sobre essa médias em relação as outros no dataset de estudo**
+
+Em todos os resultados obtidos na amostra, foi possível perceber que as médias de redação foram maiores do que as médias das médias das outras provas, isso pode ser um indício de que para conseguir uma aprovação no ENEM a prova de redação é a mais importante nota para o resultado final, desde que se consiga uma boa média nas outras provas
+
+```{r echo = FALSE, include=TRUE}
+descip_medias = c("Ciências da Natureza", "Ciências Humanas", "Matemática", "Língua Portuguesa",
+                  "Redação", "Médias sem Redação", "Taxa de aprovação")
+
+kable(cbind(enem_2015$media_ciencias_da_natureza, enem_2015$media_ciencias_humanas
+            , enem_2015$media_matematica, enem_2015$media_lingua_portuguesa,
+            enem_2015$media_redacao, enem_2015$media_sem_redacao,
+            enem_2015$taxa_de_aprovacao[order(enem_2015$taxa_de_aprovacao, decreasing=TRUE)]),col.names = c(descip_medias))
+```
+
+Uma relação inversa é observada quando se compara as médias de reprovação e se avalia os resultados das notas de redação e das médias das outras provas.
+
+```{r echo = FALSE, include=TRUE}
+descip_medias = c("Ciências da Natureza", "Ciências Humanas", "Matemática", "Língua Portuguesa",
+                  "Redação", "Médias sem Redação", "Taxa de aprovação")
+
+kable(cbind(enem_2015$media_ciencias_da_natureza, enem_2015$media_ciencias_humanas
+            , enem_2015$media_matematica, enem_2015$media_lingua_portuguesa,
+            enem_2015$media_redacao, enem_2015$media_sem_redacao,
+            enem_2015$taxa_de_aprovacao[order(enem_2015$taxa_de_reprovacao, decreasing=FALSE)]),col.names = c(descip_medias))
+```
+
+#
